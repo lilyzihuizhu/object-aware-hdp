@@ -22,6 +22,7 @@ end
 Base.@kwdef struct ObjectData
     j::Int                              # category index
     z::Int                              # cluster index
+    i::Int                              # object index within a category
     phi::Vector{Float64}                # object mean (latent)
     percepts::Vector{Vector{Float64}}   # y_o \in R^d for o = 1..O_i
 end
@@ -45,4 +46,11 @@ end
 "Full dataset across multiple categories."
 Base.@kwdef struct Dataset
     categories::Vector{CategorySample}  # length J
+end
+
+"Train/test view for one category, splitting at the object level."
+struct CategoryTrainTest
+    train_objects_uniform::Vector{ObjectData}
+    train_objects_skewed::Vector{ObjectData}
+    test_objects::Vector{ObjectData}
 end

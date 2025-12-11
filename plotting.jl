@@ -20,15 +20,15 @@ For the given category:
 
 Arguments
 ---------
-cat    :: CategorySample
+cat             :: CategorySample
     Category to visualize (must be 2D: length of `mu` and `phi` is 2).
-hyper  :: ObjectAwareHDPHyperparams
+hyper           :: ObjectAwareHDPHyperparams
     Hyperparameters, providing `m0` and `k_per`.
-plt   : Plot or `nothing` (default = nothing)
+plt             : Plot or `nothing` (default = nothing)
     Existing plot to draw into; if `nothing`, a new plot is created.
-r_scale :: Float64
+r_scale         :: Float64
     Optional scaling factor for the percept circles (default 1.0).
-show_legend : Bool (default = true)
+show_legend     : Bool (default = true)
     Whether to show legend entries for this category.
 cluster_palette :: Union{Symbol,Nothing} = nothing
     Color palette used to generate the cluster colors. If `nothing`
@@ -79,21 +79,27 @@ function plot_category(cat::CategorySample,
         distinguishable_colors(K) :
         palette(cluster_palette, K)   # different shades of same family
 
+    k_min = 1 # make sure that we plot the legend on the nonempty cluster w/ the smallest index 
     for (k, mu_k) in enumerate(cat.mus)
         mux, muy = mu_k[1], mu_k[2]
         color = cluster_colors[k]
 
-        # connect mu_k to m0
-        plot!(plt, [m0x, mux], [m0y, muy],
-              lc = :black, alpha = 0.7, label=false)
-
-        # plot mu_k itself
-        scatter!(plt, [mux], [muy], c = color,
-                 marker = :diamond, ms = 7,
-                 label = (k == 1 && show_legend) ? "mu_k (cluster means)" : "")
-
         # collect objects belonging to this cluster
-        objs_k = (obj for obj in cat.objects if obj.z == k)
+        objs_k = [obj for obj in cat.objects if obj.z == k]
+
+        if isempty(objs_k)
+            if k == k_min
+                k_min += 1
+            end
+        else
+            # connect mu_k to m0
+            plot!(plt, [m0x, mux], [m0y, muy],
+            lc = :black, alpha = 0.7, label=false)
+            # plot mu_k itself
+            scatter!(plt, [mux], [muy], c = color,
+                    marker = :diamond, ms = 7,
+                    label = (k == k_min && show_legend) ? "mu_k (cluster means)" : "")
+        end 
 
         # 3. For each object in cluster k
         for (i, obj) in enumerate(objs_k)
@@ -111,13 +117,13 @@ function plot_category(cat::CategorySample,
                   seriestype = :shape,   
                   fillcolor = color,
                   linecolor = nothing, linewidth=0,
-                  label = false, alpha = 0.1 
+                  label = false, alpha = 0.05 
                 )
 
             # object mean phi_i
             scatter!(plt, [phix], [phiy], c = color,
                      marker = :circle, ms = 4,
-                     label = (k==1 && i == 1 && show_legend) ? "phi_i (object means)" : "")
+                     label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
 
             # percepts y_io
             ys = obj.percepts
@@ -146,12 +152,14 @@ percepts) share that base color.
 
 Arguments
 ---------
-cats   : Vector{CategorySample}
+cats        : Vector{CategorySample}
     List of categories to visualize.
-hypers : Vector{ObjectAwareHDPHyperparams}
+hypers      : Vector{ObjectAwareHDPHyperparams}
     Hyperparameters associated with each category (same length as `cats`).
-r_scale  : Real (default = 2.0)
+r_scale     : Real (default = 2.0)
     Number of standard deviations used for object-circle radii.
+title       : String (default = "Multiple Categories")
+    Plot title
 
 Returns
 -------
@@ -160,13 +168,14 @@ plt :: Plots.Plot
 """
 function plot_categories(cats::Vector{CategorySample},
                          hypers::Vector{ObjectAwareHDPHyperparams};
+                         title::String = "Multiple Categories",
                          r_scale::Real = 2.0)
 
     @assert length(cats) == length(hypers) "cats and hypers must have same length"
 
     plt = plot(xlabel = "x1", ylabel = "x2",
                aspect_ratio = 1,
-               title = "Multiple categories",
+               title = title,
                legend = :bottomright,
           )
     
