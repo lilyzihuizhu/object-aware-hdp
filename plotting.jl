@@ -28,6 +28,8 @@ plt             : Plot or `nothing` (default = nothing)
     Existing plot to draw into; if `nothing`, a new plot is created.
 r_scale         :: Float64
     Optional scaling factor for the percept circles (default 1.0).
+plot_circles     : Bool (default = true)
+    Whether to plot the circles that sketch the mean and variance of each object.
 show_legend     : Bool (default = true)
     Whether to show legend entries for this category.
 cluster_palette :: Union{Symbol,Nothing} = nothing
@@ -45,7 +47,7 @@ function plot_category(cat::CategorySample,
                        hyper::ObjectAwareHDPHyperparams; 
                        plt = nothing,
                        r_scale::Float64 = 2.0,
-                       show_legend::Bool = true,
+                       plot_circles::Bool = true, show_legend::Bool = true,
                        cluster_palette::Union{Symbol,Nothing} = nothing)
 
     # sanity check
@@ -110,20 +112,22 @@ function plot_category(cat::CategorySample,
                   lc = :gray, alpha = 0.7, label=false)
 
             # circle around phi_i with radius r_per
-            theta = range(0, 2pi; length = 100)
-            circle_x = phix .+ r_per .* cos.(theta)
-            circle_y = phiy .+ r_per .* sin.(theta)
-            plot!(plt, circle_x, circle_y,
-                  seriestype = :shape,   
-                  fillcolor = color,
-                  linecolor = nothing, linewidth=0,
-                  label = false, alpha = 0.05 
-                )
-
+            if plot_circles
+                theta = range(0, 2pi; length = 100)
+                circle_x = phix .+ r_per .* cos.(theta)
+                circle_y = phiy .+ r_per .* sin.(theta)
+                plot!(plt, circle_x, circle_y,
+                    seriestype = :shape,   
+                    fillcolor = color,
+                    linecolor = nothing, linewidth=0,
+                    label = false, alpha = 0.05 
+                    )
+            end 
+            
             # object mean phi_i
             scatter!(plt, [phix], [phiy], c = color,
-                     marker = :circle, ms = 4,
-                     label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
+                        marker = :circle, ms = 4,
+                        label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
 
             # percepts y_io
             ys = obj.percepts
@@ -131,7 +135,7 @@ function plot_category(cat::CategorySample,
             py = [y[2] for y in ys]
             scatter!(plt, px, py, c = color,
                      marker = :circle, ms = 2,
-                     alpha = 0.3, markerstrokewidth=0,
+                     alpha = 0.3, markerstrokewidth=0.5,
                      label = false)
         end
     end
@@ -156,10 +160,12 @@ cats        : Vector{CategorySample}
     List of categories to visualize.
 hypers      : Vector{ObjectAwareHDPHyperparams}
     Hyperparameters associated with each category (same length as `cats`).
-r_scale     : Real (default = 2.0)
-    Number of standard deviations used for object-circle radii.
+plot_circles     : Bool (default = true)
+    Whether to plot the circles that sketch the mean and variance of each object.
 title       : String (default = "Multiple Categories")
     Plot title
+r_scale     : Real (default = 2.0)
+    Number of standard deviations used for object-circle radii.
 
 Returns
 -------
@@ -168,6 +174,7 @@ plt :: Plots.Plot
 """
 function plot_categories(cats::Vector{CategorySample},
                          hypers::Vector{ObjectAwareHDPHyperparams};
+                         plot_circles::Bool = true,
                          title::String = "Multiple Categories",
                          r_scale::Real = 2.0)
 
@@ -194,6 +201,7 @@ function plot_categories(cats::Vector{CategorySample},
         # ---- Plot the category ----
         plot_category(cat, hyper;
                       r_scale = r_scale,
+                      plot_circles = plot_circles,
                       show_legend = idx==1, 
                       plt = plt,
                       cluster_palette = pal)
