@@ -36,7 +36,6 @@ j     : category label
 Ii    : number of objects in the category (adding i to avoid confusion with LinearAlgebra.I)
 O     : number of percepts per object (fixed for simplicity)
 d     : feature dimension
-alpha : CRP concentration (controls number of clusters)
 hyper : ObjectAwareHDPHyperparams
 
 Returns
@@ -44,7 +43,6 @@ Returns
 CategorySample with sigma^2, cluster means mu_k, and per-object percept data.
 """
 function sample_category(; j::Int, Ii::Int, O::Int, d::Int,
-                         alpha::Float64,
                          hyper::ObjectAwareHDPHyperparams,
                          rng = Random.default_rng())
 
@@ -64,7 +62,7 @@ function sample_category(; j::Int, Ii::Int, O::Int, d::Int,
 
     for i in 1:Ii
         # 3a. CRP: choose cluster for object i
-        k = sample_crp_cluster!(n_k=n_k, alpha=alpha, rng=rng)
+        k = sample_crp_cluster!(n_k=n_k, alpha=hyper.alpha, rng=rng)
 
         # If this is a brand-new cluster, sample its mean mu_k
         if k > length(mus)
