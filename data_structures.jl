@@ -56,3 +56,58 @@ struct CategoryTrainTest
     train_objects_skewed::Vector{ObjectData}
     test_objects::Vector{ObjectData}
 end
+
+"""
+Hyperparameters for the traditional HDP+,infinity generative model.
+
+m0      : prior mean for feature vectors (d-dimensional)
+k_clu   : shrinkage from cluster means mu_k toward m0
+k_obj   : shrinkage from object means phi_i toward their cluster mean mu_k
+k_per   : shrinkage from percepts y_io toward their object mean phi_i
+a0,b0   : Inverse-Gamma hyperparameters for sigma^2 (per category)
+alpha   : CRP concentration (controls number of clusters)
+"""
+Base.@kwdef struct TraditionalHDPHyperparams
+    m0::Vector{Float64}
+    k_clu::Float64
+    k_obj::Float64
+    a0::Float64
+    b0::Float64
+    alpha::Float64 = 1.0
+end
+
+"""
+Sufficient statistics for a cluster (single category)
+"""
+Base.@kwdef mutable struct TraditionalHDPClusterStats
+    n::Int                      # number of points
+    sum_x::Vector{Float64}      # sum x \in R^d
+    sumsq::Float64              # sum ||x||^2 (for spherical scatter) \in R
+end
+
+function TraditionalHDPClusterStats(d::Int)
+    TraditionalHDPClusterStats(0, zeros(d), 0.0)
+end
+
+"""
+Sufficient statistics for a cluster in the object-aware HDP+,infinity.
+
+These are the aggregate terms that appear in Eq. (28) of the writeup:
+  - sum_kperS           : sum k_per S_i
+  - sum_rho             : sum rho_i
+  - sum_rho_ybar        : sum rho_i * ybar_i
+  - sum_rho_ybar_norm2  : sum rho_i * ||ybar_i||^2
+  - total_percepts      : sum O_i 
+"""
+Base.@kwdef mutable struct ObjectAwareHDPClusterStats
+    n_obj::Int                    # number of objects assigned to this cluster
+    total_percepts::Int           # total number of percepts across objects
+    sum_kperS::Float64            # sum k_per S_i \in R
+    sum_rho::Float64              # sum rho_i \in R
+    sum_rho_ybar::Vector{Float64} # sum rho_i * ybar_i \in R^d
+    sum_rho_ybar_norm2::Float64   # sum rho_i * ||ybar_i||^2 \in R
+end
+
+function ObjectAwareHDPClusterStats(d::Int)
+    ObjectAwareHDPClusterStats(0, 0, 0.0, 0.0, zeros(d), 0.0)
+end
