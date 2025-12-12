@@ -153,7 +153,7 @@ function train_test_split_sample_percepts(cat::CategorySample;
     ## -------------------------------------------------------
     test_percept_counts = fill(5, length(test_objs))
 
-    new_test_objs = Vector{ObjectData}(undef, n_train)
+    new_test_objs = Vector{ObjectData}(undef, length(test_objs))
     for (t, (obj, n)) in enumerate(zip(test_objs, test_percept_counts))
         existing = obj.percepts
         new_percepts = shuffle(rng, existing)[1:n]

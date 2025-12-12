@@ -7,6 +7,7 @@ k_obj   : shrinkage from object means phi_i toward their cluster mean mu_k
 k_per   : shrinkage from percepts y_io toward their object mean phi_i
 a0,b0   : Inverse-Gamma hyperparameters for sigma^2 (per category)
 sigma2  : prior variance if one wishes to hard code it instead of sampling it from IG(a0, b0)
+alpha   : CRP concentration (controls number of clusters)
 """
 Base.@kwdef struct ObjectAwareHDPHyperparams
     m0::Vector{Float64}
@@ -16,6 +17,7 @@ Base.@kwdef struct ObjectAwareHDPHyperparams
     a0::Union{Float64,Nothing} = nothing
     b0::Union{Float64,Nothing} = nothing
     sigma2::Union{Float64,Nothing} = nothing
+    alpha::Float64 = 1.0
 end
 
 "Data for one object: its category label, cluster label, and percepts."

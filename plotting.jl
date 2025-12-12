@@ -122,13 +122,12 @@ function plot_category(cat::CategorySample,
                     linecolor = nothing, linewidth=0,
                     label = false, alpha = 0.05 
                     )
+                
+                # object mean phi_i
+                scatter!(plt, [phix], [phiy], c = color,
+                         marker = :circle, ms = 4,
+                         label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
             end 
-            
-            # object mean phi_i
-            scatter!(plt, [phix], [phiy], c = color,
-                        marker = :circle, ms = 4,
-                        label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
-
             # percepts y_io
             ys = obj.percepts
             px = [y[1] for y in ys]
