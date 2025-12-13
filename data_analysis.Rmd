@@ -1,0 +1,101 @@
+
+```{r}
+library(lmerTest)
+library(tidyverse)
+```
+
+
+```{r}
+results <- read.csv("results_all.csv")
+results$correct <- results$correct == "true" 
+```
+
+```{r}
+temp.lmer <- glmer(correct ~ model * training_type + (1|split),
+                   data = results, family = "binomial")
+summary(temp.lmer)
+```
+
+```{r}
+results %>% group_by(split, model, training_type) %>% 
+  summarise(acc = mean(correct)) %>% 
+ggplot(aes(x=model, y=acc)) +
+  ggforce::geom_sina(aes(color=model), alpha=0.2, show.legend = F, size=3) + 
+  stat_summary(geom = 'errorbar', fun.data=mean_se, 
+               show.legend = F, width=0.2) +
+  stat_summary(aes(fill=model), geom = 'pointrange', 
+               fun.data=mean_se, shape=23, show.legend = F) +
+  facet_wrap(~ training_type) +
+  theme_bw()
+```
+
+
+```{r}
+library(ggforce)
+
+results %>% 
+  mutate(
+    true_cat = factor(true_cat),
+    model_cat = interaction(model, true_cat, sep = "_")  # new x variable
+  ) %>% 
+  group_by(split, model, training_type, true_cat, model_cat) %>% 
+  summarise(acc = mean(correct)) %>% 
+  ggplot(aes(x = model_cat, y = acc, colour = true_cat)) +
+  geom_sina(alpha = 0.6, size = 1.8) +
+  stat_summary(
+    aes(fill = true_cat),
+    geom = "pointrange",
+    fun.data = mean_se,
+    colour = "black",
+    shape = 23,
+    show.legend = TRUE
+  ) +
+  facet_wrap(~ training_type) +
+  # show only one label per pair (obj, "", trad, "")
+  scale_x_discrete(
+    name   = "model",
+    labels = c("obj", "", "trad", "")
+  ) +
+  theme_bw()
+
+```
+
+```{r}
+results %>% 
+  mutate(true_cat = factor(true_cat)) %>% 
+  group_by(split, true_cat, model, training_type) %>% 
+  summarise(mean_logp_cat1 = mean(logp_cat1)) %>% 
+ggplot(aes(x=true_cat, y=mean_logp_cat1)) +
+  ggforce::geom_sina(alpha=0.5) +
+  stat_summary(geom = 'errorbar', fun.data=mean_se, 
+               show.legend = F, width=0.2) +
+  stat_summary(aes(fill=model), geom = 'pointrange', 
+               fun.data=mean_se, shape=23, show.legend = F) +
+  facet_grid(model ~ training_type)
+```
+
+```{r}
+results %>% 
+  mutate(true_cat = factor(true_cat)) %>% 
+  group_by(split, true_cat, model, training_type) %>% 
+  summarise(mean_logp_cat2 = mean(logp_cat2)) %>% 
+ggplot(aes(x=true_cat, y=mean_logp_cat2)) +
+  ggforce::geom_sina(alpha=0.3) +
+  stat_summary(geom = 'errorbar', fun.data=mean_se, 
+               show.legend = F, width=0.2) +
+  stat_summary(aes(fill=model), geom = 'pointrange', 
+               fun.data=mean_se, shape=23, show.legend = F) +
+  facet_grid(model ~ training_type) +
+  theme_bw()
+```
+
+```{r}
+results %>% 
+    mutate(true_cat = paste0("cat", true_cat)) %>% 
+    group_by(split, true_cat, model, training_type) %>% 
+    summarise(mean_logp_cat2 = mean(logp_cat2)) %>% 
+    pivot_wider(values_from = mean_logp_cat2, names_from = true_cat) %>% 
+    mutate(prefer_novel_cat_score = cat2-cat1) %>% View
+# TODO
+```
+

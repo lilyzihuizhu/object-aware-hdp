@@ -122,12 +122,11 @@ function plot_category(cat::CategorySample,
                     linecolor = nothing, linewidth=0,
                     label = false, alpha = 0.05 
                     )
-                
-                # object mean phi_i
-                scatter!(plt, [phix], [phiy], c = color,
-                         marker = :circle, ms = 4,
-                         label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
             end 
+            # object mean phi_i
+            scatter!(plt, [phix], [phiy], c = color,
+                     marker = :circle, ms = 4,
+                     label = (k==k_min && i == 1 && show_legend) ? "phi_i (object means)" : "")
             # percepts y_io
             ys = obj.percepts
             px = [y[1] for y in ys]
@@ -207,4 +206,32 @@ function plot_categories(cats::Vector{CategorySample},
     end
 
     return plt
+end
+
+using Plots
+
+"""
+    plot_clusters(pts, labels; markersize=6)
+
+Plot 2D points `pts` colored by their cluster `labels`.
+`pts` is assumed to be a vector of (x, y) pairs.
+"""
+function plot_clusters(pts, labels)
+    @assert length(pts) == length(labels)
+
+    unique_labels = unique(labels)
+
+    plt = plot()  # empty plot
+
+    for lab in unique_labels
+        idx = findall(==(lab), labels)
+        xs = first.(pts[idx])
+        ys = last.(pts[idx])
+        scatter!(plt, xs, ys;
+                 label = "Cluster $lab",
+                 marker = :circle, ms = 4,
+                 alpha=0.5, markerstrokewidth=0.5)
+    end
+
+    plot!(plt, xlabel="x1", ylabel="x2", legend=:outerright)
 end
