@@ -1,101 +1,277 @@
 
-```{r}
+```{r setup, include=FALSE, warning=FALSE}
 library(lmerTest)
 library(tidyverse)
 ```
 
+# Analyze accuracy
 
+## Accuracy by model and input type
 ```{r}
-results <- read.csv("results_all.csv")
+results <- read.csv("data/results_all.csv")
 results$correct <- results$correct == "true" 
+
+subj.acc <- results %>% group_by(split, model, training_type) %>% 
+  summarise(acc=mean(correct))
 ```
 
-```{r}
-temp.lmer <- glmer(correct ~ model * training_type + (1|split),
-                   data = results, family = "binomial")
-summary(temp.lmer)
-```
-
-```{r}
-results %>% group_by(split, model, training_type) %>% 
-  summarise(acc = mean(correct)) %>% 
-ggplot(aes(x=model, y=acc)) +
-  ggforce::geom_sina(aes(color=model), alpha=0.2, show.legend = F, size=3) + 
-  stat_summary(geom = 'errorbar', fun.data=mean_se, 
+```{r, fig.height=2.5, fig.width=3}
+subj.acc %>% 
+  mutate(model=recode(model, obj="Object-Aware HDP", trad="Traditional HDP"),
+         training_type=factor(str_to_title(training_type), levels=c("Uniform", "Skewed"))) %>% 
+ggplot(aes(x=training_type, y=acc)) +
+  geom_line(aes(group=split), alpha=0.1) +
+  geom_dotplot(aes(fill=training_type), binaxis = "y", alpha=0.3,
+               stackdir = "center", dotsize = 0.9, show.legend = F) +
+  stat_summary(geom = 'errorbar', fun.data=mean_se, linewidth=0.5,
                show.legend = F, width=0.2) +
-  stat_summary(aes(fill=model), geom = 'pointrange', 
+  stat_summary(aes(fill=training_type), geom = 'pointrange', size=0.3,
                fun.data=mean_se, shape=23, show.legend = F) +
-  facet_wrap(~ training_type) +
-  theme_bw()
-```
-
-
-```{r}
-library(ggforce)
-
-results %>% 
-  mutate(
-    true_cat = factor(true_cat),
-    model_cat = interaction(model, true_cat, sep = "_")  # new x variable
-  ) %>% 
-  group_by(split, model, training_type, true_cat, model_cat) %>% 
-  summarise(acc = mean(correct)) %>% 
-  ggplot(aes(x = model_cat, y = acc, colour = true_cat)) +
-  geom_sina(alpha = 0.6, size = 1.8) +
-  stat_summary(
-    aes(fill = true_cat),
-    geom = "pointrange",
-    fun.data = mean_se,
-    colour = "black",
-    shape = 23,
-    show.legend = TRUE
-  ) +
-  facet_wrap(~ training_type) +
-  # show only one label per pair (obj, "", trad, "")
-  scale_x_discrete(
-    name   = "model",
-    labels = c("obj", "", "trad", "")
-  ) +
-  theme_bw()
-
+  facet_wrap(~ model) +
+  theme_bw() + xlab("Input Type") + ylab("Test Accuracy") +
+  theme(aspect.ratio = 1.5/1, text=element_text(size=8))
+ggsave("figures/acc.png")
 ```
 
 ```{r}
-results %>% 
-  mutate(true_cat = factor(true_cat)) %>% 
-  group_by(split, true_cat, model, training_type) %>% 
-  summarise(mean_logp_cat1 = mean(logp_cat1)) %>% 
-ggplot(aes(x=true_cat, y=mean_logp_cat1)) +
-  ggforce::geom_sina(alpha=0.5) +
-  stat_summary(geom = 'errorbar', fun.data=mean_se, 
+acc.model.traintype.glmer <- 
+  glmer(correct ~ model * training_type + (1|split) + (1|test_idx),
+        data = results, family = "binomial")
+summary(acc.model.traintype.glmer)
+
+acc.model.traintype.lmer <- 
+  lmer(acc ~ model * training_type + (1|split), data = subj.acc)
+summary(acc.model.traintype.lmer)
+```
+
+# Visualize data points 
+
+## Ground truths
+```{r}
+ground_truths <- rbind(read.csv("data/category1.csv"), read.csv("data/category2.csv"))
+ground_truths_categories <- data.frame(
+  category_id = c(1,2), category_m0_x1 = c(-0.5,0.5), category_m0_x2 = c(-0.5,0.5) 
+)
+ground_truths_clusters <- ground_truths %>% 
+  select(starts_with("cluster"), category_id) %>% distinct() %>% 
+  mutate(category_m0_x1 = ifelse(category_id==1, -0.5, 0.5),
+         category_m0_x2 = ifelse(category_id==1, -0.5, 0.5))
+ground_truths_objects <- ground_truths %>% 
+  select(starts_with("object"), cluster_mu_x1, cluster_mu_x2, 
+         cluster_id, category_id) %>% distinct()
+
+ggplot(ground_truths, aes(x=percept_x1, y=percept_x2, color=as.factor(category_id))) + 
+  geom_point(aes(shape="Perceptual Samples"), size=1, stroke=1, alpha=0.2) +
+  geom_point(data=ground_truths_categories, size=5, stroke=1.5,
+             aes(x=category_m0_x1, y=category_m0_x2, color=as.factor(category_id),
+                 shape="Category Center")) +
+  geom_point(data=ground_truths_clusters, size=4, stroke=1, alpha=0.9, 
+             aes(x=cluster_mu_x1, y=cluster_mu_x2, color=as.factor(category_id),
+                 shape="Cluster Center")) +
+  geom_segment(data=ground_truths_clusters,
+    aes(x = cluster_mu_x1, y = cluster_mu_x2, 
+        xend = category_m0_x1, yend = category_m0_x2),
+        linewidth = 0.7, alpha = 0.8) +
+  geom_point(data=ground_truths_objects, size=2.5, stroke=1, alpha=0.8,
+             aes(x=object_phi_x1, y=object_phi_x2, color=as.factor(category_id),
+                 shape="Object Center")) +
+  geom_segment(data=ground_truths_objects,
+    aes(x = object_phi_x1, y = object_phi_x2, 
+        xend = cluster_mu_x1, yend = cluster_mu_x2),  
+        linewidth = 0.3, alpha = 0.5) +
+  scale_color_manual(values = c("darkred", "darkblue"), name="Category") + 
+  scale_shape_manual(
+    name="Dot Type",  
+    values=c("Category Center"=19, "Cluster Center"=16, 
+             "Object Center"=1, "Perceptual Samples"=20)) + 
+  theme_bw() + ggtitle("Sample Uniform Input") +
+  theme(aspect.ratio = 1/1.2, text=element_text(size=15)) + 
+  xlab("x1") + ylab("x2") + xlim(-3, 6) + ylim(-2.1,3.7)
+```
+
+## Uniform training
+```{r}
+uniform_training <- rbind(read.csv("data/sample_cat1_train_uniform.csv"),
+                          read.csv("data/sample_cat2_train_uniform.csv"))
+uniform_training_clusters <- uniform_training %>% 
+  select(starts_with("cluster"), category_id) %>% distinct() %>% 
+  mutate(category_m0_x1 = ifelse(category_id==1, -0.5, 0.5),
+         category_m0_x2 = ifelse(category_id==1, -0.5, 0.5))
+uniform_training_objects <- uniform_training %>% 
+  select(starts_with("object"), cluster_mu_x1, cluster_mu_x2, 
+         cluster_id, category_id) %>% distinct()
+
+ggplot(uniform_training, aes(x=percept_x1, y=percept_x2, color=as.factor(category_id))) + 
+  geom_point(aes(shape="Perceptual Samples"), size=2, stroke=1, alpha=0.3) +
+  geom_segment(aes(x = percept_x1, y = percept_x2,
+                   xend = object_phi_x1, yend = object_phi_x2),
+               linewidth = 0.2, alpha = 0.3) +
+  geom_point(data=uniform_training_objects, size=2.5, stroke=1, alpha=0.8,
+             aes(x=object_phi_x1, y=object_phi_x2, color=as.factor(category_id),
+                 shape="Object Center")) +
+  scale_color_manual(values = c("darkred", "darkblue"), name="Category") + 
+  scale_shape_manual(
+    name="Dot Type",  
+    values=c("Category Center"=19, "Cluster Center"=16, 
+             "Object Center"=1, "Perceptual Samples"=20)) + 
+  theme_bw() + ggtitle("Sample Uniform Input") +
+  theme(aspect.ratio = 1/1.2, text=element_text(size=15)) + 
+  xlab("x1") + ylab("x2") + xlim(-3, 6) + ylim(-2.1,3.7)
+```
+
+## Skewed training
+```{r}
+skewed_training <- rbind(read.csv("data/sample_cat1_train_skewed.csv"),
+                         read.csv("data/sample_cat2_train_skewed.csv"))
+skewed_training_clusters <- skewed_training %>% 
+  select(starts_with("cluster"), category_id) %>% distinct() %>% 
+  mutate(category_m0_x1 = ifelse(category_id==1, -0.5, 0.5),
+         category_m0_x2 = ifelse(category_id==1, -0.5, 0.5))
+skewed_training_objects <- skewed_training %>% 
+  select(starts_with("object"), cluster_mu_x1, cluster_mu_x2, 
+         cluster_id, category_id) %>% distinct()
+
+ggplot(skewed_training, aes(x=percept_x1, y=percept_x2, color=as.factor(category_id))) + 
+  geom_point(aes(shape="Perceptual Samples"), size=2, stroke=1, alpha=0.3) +
+  geom_segment(aes(x = percept_x1, y = percept_x2,
+                   xend = object_phi_x1, yend = object_phi_x2),
+               linewidth = 0.2, alpha = 0.3) +
+  geom_point(data=skewed_training_objects, size=2.5, stroke=1, alpha=0.8,
+             aes(x=object_phi_x1, y=object_phi_x2, color=as.factor(category_id),
+                 shape="Object Center")) +
+  scale_color_manual(values = c("darkred", "darkblue"), name="Category") + 
+  scale_shape_manual(
+    name="Dot Type",  
+    values=c("Category Center"=19, "Cluster Center"=16, 
+             "Object Center"=1, "Perceptual Samples"=20)) + 
+  theme_bw() + ggtitle("Sample Skewed Input") +
+  theme(aspect.ratio = 1/1.2, text=element_text(size=15)) + 
+  xlab("x1") + ylab("x2") + xlim(-3, 6) + ylim(-2.1,3.7)
+```
+
+## Test set
+```{r}
+test_set <- rbind(read.csv("data/sample_cat1_test.csv"),
+                  read.csv("data/sample_cat2_test.csv"))
+test_set_clusters <- test_set %>% 
+  select(starts_with("cluster"), category_id) %>% distinct() %>% 
+  mutate(category_m0_x1 = ifelse(category_id==1, -0.5, 0.5),
+         category_m0_x2 = ifelse(category_id==1, -0.5, 0.5))
+test_set_objects <- test_set %>% 
+  select(starts_with("object"), cluster_mu_x1, cluster_mu_x2, 
+         cluster_id, category_id) %>% distinct()
+
+ggplot(test_set, aes(x=percept_x1, y=percept_x2, color=as.factor(category_id))) + 
+  geom_point(aes(shape="Perceptual Samples"), size=2, stroke=1, alpha=0.3) +
+  geom_segment(aes(x = percept_x1, y = percept_x2,
+                   xend = object_phi_x1, yend = object_phi_x2),
+               linewidth = 0.2, alpha = 0.3) +
+  geom_point(data=test_set_objects, size=2.5, stroke=1, alpha=0.8,
+             aes(x=object_phi_x1, y=object_phi_x2, color=as.factor(category_id),
+                 shape="Object Center")) +
+  scale_color_manual(values = c("darkred", "darkblue"), name="Category") + 
+  scale_shape_manual(
+    name="Dot Type",  
+    values=c("Category Center"=19, "Cluster Center"=16, 
+             "Object Center"=1, "Perceptual Samples"=20)) + 
+  theme_bw() + ggtitle("Sample Test Set") +
+  theme(aspect.ratio = 1/1.2, text=element_text(size=15)) + 
+  xlab("x1") + ylab("x2") + xlim(-3, 6) + ylim(-2.1,3.7)
+```
+
+## Test performance 
+```{r, fig.height=3, fig.width=3}
+results %>% filter(split==59) %>% 
+  mutate(pred_cat=paste("Category",pred_cat),
+         outcome = ifelse(correct, "Correct", "Incorrect")) %>% 
+  mutate(model=recode(model, obj="Object-Aware HDP", trad="Traditional HDP"),
+         training_type=factor(paste(str_to_title(training_type), "Input"), 
+                              levels=c("Uniform Input", "Skewed Input"))) %>%
+ggplot(aes(x=test_x1, y=test_x2, color=pred_cat)) + 
+  geom_point(aes(shape=outcome, alpha=outcome), size=1, stroke=0.8) +
+  scale_shape_manual(values = c(16, 4), name="Outcome") + 
+  scale_alpha_manual(values = c(0.3, 1), name="Outcome") +
+  scale_color_manual(values = c("darkred", "darkblue"), name="Predicted Category") + 
+  facet_grid(model ~ training_type) + theme_bw() +
+  theme(aspect.ratio = 1/1.2, text=element_text(size=8), 
+        legend.position = "bottom", legend.box = 'vertical', 
+        legend.margin = margin(-10,0,-4,0), legend.title = element_text(size=7)) + 
+  xlab("x1") + ylab("x2") + xlim(-3, 6) + ylim(-2.1,3.7)
+ggsave("figures/point_predictions.png")
+```
+
+# Effects of within-category variance
+
+## Accuracy by ground truth category
+```{r, fig.height=3, fig.width=4}
+results %>% group_by(training_type, model, true_cat, split) %>% 
+  summarise(acc=mean(correct)) %>% 
+  mutate(model=recode(model, obj="Object-Aware HDP", trad="Traditional HDP"),
+         training_type=factor(paste(str_to_title(training_type), "Input"), 
+                              levels=c("Uniform Input", "Skewed Input")),
+         true_cat=paste("Category",true_cat)) %>% 
+ggplot(aes(x=true_cat, y=acc)) +
+  geom_dotplot(aes(fill=true_cat), binaxis = "y", alpha=0.3, 
+               stackdir = "center", dotsize = 1.5, show.legend = F) +
+  stat_summary(geom = 'errorbar', fun.data=mean_se, linewidth=0.5,
                show.legend = F, width=0.2) +
-  stat_summary(aes(fill=model), geom = 'pointrange', 
+  stat_summary(aes(fill=true_cat), geom = 'pointrange', stroke=0.7,
                fun.data=mean_se, shape=23, show.legend = F) +
-  facet_grid(model ~ training_type)
+  facet_grid(model ~ training_type) + theme_bw() + 
+  scale_fill_manual(values=c("gold", "violet")) +
+  xlab("Ground Truth Category") + ylab("Test Accuracy") +
+  theme(aspect.ratio = 1/1.3)
 ```
 
-```{r}
-results %>% 
-  mutate(true_cat = factor(true_cat)) %>% 
-  group_by(split, true_cat, model, training_type) %>% 
-  summarise(mean_logp_cat2 = mean(logp_cat2)) %>% 
-ggplot(aes(x=true_cat, y=mean_logp_cat2)) +
-  ggforce::geom_sina(alpha=0.3) +
-  stat_summary(geom = 'errorbar', fun.data=mean_se, 
-               show.legend = F, width=0.2) +
-  stat_summary(aes(fill=model), geom = 'pointrange', 
-               fun.data=mean_se, shape=23, show.legend = F) +
-  facet_grid(model ~ training_type) +
-  theme_bw()
-```
-
-```{r}
-results %>% 
-    mutate(true_cat = paste0("cat", true_cat)) %>% 
+## Novelty preference
+```{r, fig.height=3, fig.width=4}
+novel_pref_scores <- rbind(
+  results %>% 
+    mutate(true_cat = paste0("cat", true_cat), 
+           p_cat1=exp(logp_cat1)) %>% 
     group_by(split, true_cat, model, training_type) %>% 
-    summarise(mean_logp_cat2 = mean(logp_cat2)) %>% 
-    pivot_wider(values_from = mean_logp_cat2, names_from = true_cat) %>% 
-    mutate(prefer_novel_cat_score = cat2-cat1) %>% View
-# TODO
+    summarise(mean_p_cat1 = mean(p_cat1)) %>% 
+    pivot_wider(values_from = mean_p_cat1, names_from = true_cat) %>% 
+    mutate(novel_pref_score = cat1-cat2) %>% 
+    mutate(train_cat = "Category 1"),
+  results %>% 
+    mutate(true_cat = paste0("cat", true_cat), 
+           p_cat2=exp(logp_cat2)) %>% 
+    group_by(split, true_cat, model, training_type) %>% 
+    summarise(mean_p_cat2 = mean(p_cat2)) %>% 
+    pivot_wider(values_from = mean_p_cat2, names_from = true_cat) %>% 
+    mutate(novel_pref_score = cat2-cat1) %>% 
+    mutate(train_cat = "Category 2")
+) %>% 
+  mutate(model=recode(model, obj="Object-Aware HDP", trad="Traditional HDP"),
+         training_type=factor(paste(str_to_title(training_type), "Input"), 
+                              levels=c("Uniform Input", "Skewed Input"))) 
+
+ggplot(novel_pref_scores, aes(x=train_cat, y=novel_pref_score)) +
+  geom_hline(yintercept = 0, linetype=2) + 
+  geom_dotplot(aes(fill=train_cat), binaxis = "y", alpha=0.3,
+               stackdir = "center", dotsize = 1.5, show.legend = F) +
+  stat_summary(geom = 'errorbar', fun.data=mean_se, linewidth=0.5,
+               show.legend = F, width=0.2) +
+  stat_summary(aes(fill=train_cat), geom = 'pointrange', stroke=0.7,
+               fun.data=mean_se, shape=23, show.legend = F) +
+  facet_grid(model ~ training_type) + theme_bw() + 
+  scale_fill_manual(values=c("gold", "violet")) +
+  xlab("Input Category") + ylab("Preference for Novel Category") +
+  theme(aspect.ratio = 1/1.3)
+ggsave("figures/pref_novel_category.png")
+```
+
+```{r}
+library(broom)
+
+novel_pref_scores %>%
+  group_by(train_cat, training_type, model) %>%
+  do(tidy(wilcox.test(.$novel_pref_score, mu = 0, exact = FALSE, 
+                      alternative = "greater")))
+
+novel_pref_scores %>% mutate(train_cat=as.factor(train_cat)) %>% 
+  group_by(training_type, model) %>%
+  do(tidy(wilcox.test(.$novel_pref_score ~ .$train_cat, exact = FALSE)))
 ```
 

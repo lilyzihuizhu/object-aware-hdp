@@ -21,7 +21,6 @@ For the given category:
 Arguments
 ---------
 cat             :: CategorySample
-    Category to visualize (must be 2D: length of `mu` and `phi` is 2).
 hyper           :: ObjectAwareHDPHyperparams
     Hyperparameters, providing `m0` and `k_per`.
 plt             : Plot or `nothing` (default = nothing)
@@ -50,15 +49,11 @@ function plot_category(cat::CategorySample,
                        plot_circles::Bool = true, show_legend::Bool = true,
                        cluster_palette::Union{Symbol,Nothing} = nothing)
 
-    # sanity check
-    @assert length(hyper.m0) == 2 "plot_category_2d assumes 2D m0"
-    @assert all(length(mu) == 2 for mu in cat.mus) "All cluster means must be 2D"
-
     # base plot
     if plt == nothing 
         plt = plot(
             legend = show_legend,
-            aspect_ratio = :equal,
+            # aspect_ratio = :equal,
             xlabel = "x1",
             ylabel = "x2",
             title = "Category $(cat.j)"
@@ -133,7 +128,7 @@ function plot_category(cat::CategorySample,
             py = [y[2] for y in ys]
             scatter!(plt, px, py, c = color,
                      marker = :circle, ms = 2,
-                     alpha = 0.3, markerstrokewidth=0.5,
+                     alpha = 0.5, markerstrokewidth=0.5,
                      label = false)
         end
     end
@@ -146,7 +141,7 @@ end
                     hypers::Vector{ObjectAwareHDPHyperparams};
                     n_std::Real = 2.0)
 
-Overlay multiple categories in a single 2D plot.
+Overlay multiple categories in a single plot.
 
 Each category is drawn using `plot_category`, but with a distinct base color
 assigned automatically. Within a category, all elements (m0, mu_k, phi_i, and
@@ -179,7 +174,7 @@ function plot_categories(cats::Vector{CategorySample},
     @assert length(cats) == length(hypers) "cats and hypers must have same length"
 
     plt = plot(xlabel = "x1", ylabel = "x2",
-               aspect_ratio = 1,
+            #    aspect_ratio = 1,
                title = title,
                legend = :bottomright,
           )
