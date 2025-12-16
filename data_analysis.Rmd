@@ -40,9 +40,30 @@ acc.model.traintype.glmer <-
         data = results, family = "binomial")
 summary(acc.model.traintype.glmer)
 
+acc.trad.traintype.glmer <- 
+  glmer(correct ~ training_type + (1|split) + (1|test_idx),
+        data = results %>% filter(model=="trad"), family = "binomial")
+summary(acc.trad.traintype.glmer)
+
+acc.obj.traintype.glmer <- 
+  glmer(correct ~ training_type + (1|split) + (1|test_idx),
+        data = results %>% filter(model=="obj"), family = "binomial")
+summary(acc.obj.traintype.glmer)
+```
+
+
+```{r}
 acc.model.traintype.lmer <- 
   lmer(acc ~ model * training_type + (1|split), data = subj.acc)
 summary(acc.model.traintype.lmer)
+
+acc.trad.traintype.lmer <- 
+  lmer(acc ~ training_type + (1|split), data = subj.acc %>% filter(model=="trad"))
+summary(acc.trad.traintype.lmer)
+
+acc.obj.traintype.lmer <- 
+  lmer(acc ~ training_type + (1|split), data = subj.acc %>% filter(model=="obj"))
+summary(acc.obj.traintype.lmer)
 ```
 
 # Visualize data points 
